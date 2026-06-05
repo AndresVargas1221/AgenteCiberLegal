@@ -7,6 +7,9 @@ import { KB, countByCategory } from './data/knowledgeBase.js'
 import { getResponse, getEntryResponse } from './lib/bot.js'
 import { getByCategory, getById } from './lib/search.js'
 import { renderMarkdown } from './lib/markdown.js'
+import { el } from './lib/dom.js'
+import { openToolkit } from './lib/toolkit.js'
+import { resolveToolTag } from './lib/tools.js'
 
 const COUNTS = countByCategory()
 
@@ -21,28 +24,7 @@ const SUGGESTIONS = [
   '¿Cómo empiezo en ciberseguridad?',
 ]
 
-// ---------- Helper para crear elementos ----------
-function el(tag, props = {}, children = []) {
-  const node = document.createElement(tag)
-  for (const [key, value] of Object.entries(props)) {
-    if (key === 'class') node.className = value
-    else if (key === 'text') node.textContent = value
-    else if (key === 'html') node.innerHTML = value // solo para contenido controlado interno
-    else if (key.startsWith('on') && typeof value === 'function') {
-      node.addEventListener(key.slice(2).toLowerCase(), value)
-    } else if (key === 'style' && typeof value === 'object') {
-      Object.assign(node.style, value)
-    } else if (value !== undefined && value !== null) {
-      node.setAttribute(key, value)
-    }
-  }
-  const kids = Array.isArray(children) ? children : [children]
-  for (const c of kids) {
-    if (c == null) continue
-    node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c)
-  }
-  return node
-}
+// ---------- Helper para crear elementos: importado desde ./lib/dom.js ----------
 
 // ---------- Estado y referencias ----------
 let chatEl, scrollEl, inputEl, sidebarEl, overlayEl
@@ -99,6 +81,17 @@ function buildSidebar() {
   ])
   nav.appendChild(homeBtn)
 
+  // Botón Arsenal de herramientas
+  const arsenalBtn = el('button', {
+    class: 'cat-item arsenal-item',
+    onClick: () => { closeSidebar(); openToolkit('hash') },
+  }, [
+    el('span', { class: 'cat-item-icon', text: '🧰', style: { '--c': '#ff7a18' } }),
+    el('span', { class: 'cat-item-name', text: 'Arsenal de Herramientas' }),
+    el('span', { class: 'cat-item-count', text: '7' }),
+  ])
+  nav.appendChild(arsenalBtn)
+
   for (const c of CATEGORIES) {
     const btn = el('button', {
       class: 'cat-item',
@@ -147,7 +140,15 @@ function buildTopbar() {
     el('span', { class: 'status-dot' }),
     document.createTextNode('ONLINE'),
   ])
-  return el('header', { class: 'topbar' }, [menuBtn, title, status])
+  const arsenalBtn = el('button', {
+    class: 'arsenal-btn',
+    title: 'Arsenal de herramientas interactivas',
+    onClick: () => openToolkit('hash'),
+  }, [
+    el('span', { class: 'arsenal-btn-icon', text: '🧰' }),
+    el('span', { class: 'arsenal-btn-text', text: 'Arsenal' }),
+  ])
+  return el('header', { class: 'topbar' }, [menuBtn, title, arsenalBtn, status])
 }
 
 function buildChatArea() {
@@ -284,9 +285,16 @@ function buildAnswer(response) {
 
   if (entry.tools && entry.tools.length) {
     const list = el('div', { class: 'tools-list' })
-    entry.tools.forEach((t) => list.appendChild(el('span', { class: 'tool-tag', text: t })))
+    entry.tools.forEach((t) => {
+      const tag = el('button', {
+        class: 'tool-tag',
+        title: 'Abrir en el Arsenal',
+        onClick: () => openToolFromTag(t),
+      }, [t])
+      list.appendChild(tag)
+    })
     wrap.appendChild(el('div', { class: 'tools-row' }, [
-      el('span', { class: 'tools-label', text: '⚙ Herramientas' }),
+      el('span', { class: 'tools-label', text: '⚙ Herramientas · clic para usar' }),
       list,
     ]))
   }
@@ -396,6 +404,14 @@ function pickCategory(categoryId) {
   closeSidebar()
   addUserMessage(`Explorar: ${cat?.name}`)
   addBotMessage(() => buildCategoryList(categoryId))
+}
+
+// Abre el Arsenal a partir de una etiqueta de herramienta.
+function openToolFromTag(name) {
+  const r = resolveToolTag(name)
+  if (r.type === 'tool') openToolkit(r.id)
+  else if (r.type === 'ref') openToolkit('reference', r.name)
+  else openToolkit('reference', name)
 }
 
 // ---------- Init ----------
