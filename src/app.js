@@ -9,9 +9,20 @@ import { getByCategory, getById } from './lib/search.js'
 import { renderMarkdown } from './lib/markdown.js'
 import { el } from './lib/dom.js'
 import { openToolkit } from './lib/toolkit.js'
-import { resolveToolTag } from './lib/tools.js'
+import { resolveToolTag, INTERACTIVE_TOOLS } from './lib/tools.js'
+import { ensureSeed, currentUser, logout } from './lib/auth.js'
+import { getPlan } from './lib/plans.js'
+import { canQuery, consume, remaining, limitFor } from './lib/quota.js'
+import { askAI, aiEnabled } from './lib/ai.js'
+import { showAuth } from './lib/authUI.js'
+import { openBilling } from './lib/billingUI.js'
+import { openAdmin } from './lib/adminUI.js'
 
 const COUNTS = countByCategory()
+
+// Usuario en sesión (se establece en init)
+let me = null
+let accountEl = null
 
 const SUGGESTIONS = [
   '¿Qué es el OWASP Top 10?',
@@ -88,7 +99,7 @@ function buildSidebar() {
   }, [
     el('span', { class: 'cat-item-icon', text: '🧰', style: { '--c': '#ff7a18' } }),
     el('span', { class: 'cat-item-name', text: 'Arsenal de Herramientas' }),
-    el('span', { class: 'cat-item-count', text: '7' }),
+    el('span', { class: 'cat-item-count', text: String(INTERACTIVE_TOOLS.length) }),
   ])
   nav.appendChild(arsenalBtn)
 
@@ -136,10 +147,6 @@ function buildTopbar() {
       el('div', { class: 'topbar-tag', text: 'Asistente de Ciberseguridad · Defensivo & Ético' }),
     ]),
   ])
-  const status = el('div', { class: 'topbar-status' }, [
-    el('span', { class: 'status-dot' }),
-    document.createTextNode('ONLINE'),
-  ])
   const arsenalBtn = el('button', {
     class: 'arsenal-btn',
     title: 'Arsenal de herramientas interactivas',
@@ -148,7 +155,68 @@ function buildTopbar() {
     el('span', { class: 'arsenal-btn-icon', text: '🧰' }),
     el('span', { class: 'arsenal-btn-text', text: 'Arsenal' }),
   ])
-  return el('header', { class: 'topbar' }, [menuBtn, title, arsenalBtn, status])
+  accountEl = el('div', { class: 'account', id: 'account-bar' })
+  renderAccount()
+  return el('header', { class: 'topbar' }, [menuBtn, title, arsenalBtn, accountEl])
+}
+
+// Renderiza/actualiza la barra de cuenta (plan, consultas, admin, salir)
+function renderAccount() {
+  if (!accountEl) return
+  accountEl.innerHTML = ''
+  if (!me) return
+  const plan = getPlan(me.plan)
+  const rem = remaining(me)
+  const limit = limitFor(me)
+  const remLabel = rem === Infinity ? '∞' : String(rem)
+
+  // Chip de plan (abre planes)
+  const planChip = el('button', {
+    class: 'acct-plan',
+    style: { '--c': me.role === 'admin' ? '#fbbf24' : plan.color },
+    title: 'Ver y cambiar de plan',
+    onClick: () => openBilling(onUserChange),
+  }, [
+    el('span', { class: 'acct-plan-dot' }),
+    document.createTextNode(me.role === 'admin' ? 'ADMIN' : plan.name.toUpperCase()),
+  ])
+
+  // Consultas restantes
+  const queries = el('span', {
+    class: 'acct-queries',
+    title: limit === Infinity ? 'Consultas ilimitadas' : 'Consultas IA restantes hoy',
+  }, [el('span', { class: 'acct-bolt', text: '⚡' }), document.createTextNode(' ' + remLabel)])
+
+  accountEl.appendChild(planChip)
+  accountEl.appendChild(queries)
+
+  if (aiEnabled()) {
+    accountEl.appendChild(el('span', { class: 'acct-ai', title: 'IA conectada', text: 'IA' }))
+  }
+
+  if (me.role === 'admin') {
+    accountEl.appendChild(el('button', {
+      class: 'acct-icon-btn', title: 'Panel de administración', text: '🛠',
+      onClick: () => openAdmin(onUserChange),
+    }))
+  }
+
+  accountEl.appendChild(el('span', { class: 'acct-user', text: me.username }))
+  accountEl.appendChild(el('button', {
+    class: 'acct-icon-btn', title: 'Cerrar sesión', text: '⎋', onClick: handleLogout,
+  }))
+}
+
+// Callback cuando cambia el usuario (plan/rol desde billing o admin)
+function onUserChange(updated) {
+  me = updated || currentUser()
+  renderAccount()
+}
+
+function handleLogout() {
+  logout()
+  me = null
+  initAuthScreen()
 }
 
 function buildChatArea() {
@@ -229,6 +297,31 @@ function addBotMessage(buildContent) {
     bubble.appendChild(buildContent())
     scrollToBottom()
   }, delay)
+}
+
+// Variante asíncrona (para respuestas de IA). Nunca lanza errores al usuario.
+function addBotMessageAsync(builderAsync) {
+  const bubble = el('div', { class: 'bot-bubble' })
+  bubble.appendChild(el('div', { class: 'typing' }, [el('span'), el('span'), el('span')]))
+  const msg = el('div', { class: 'msg bot' }, [
+    el('div', { class: 'avatar bot-avatar', text: '◈' }),
+    bubble,
+  ])
+  chatEl.appendChild(msg)
+  scrollToBottom()
+
+  const minDelay = new Promise((r) => setTimeout(r, 420))
+  Promise.all([Promise.resolve().then(builderAsync), minDelay])
+    .then(([node]) => {
+      bubble.innerHTML = ''
+      bubble.appendChild(node)
+      scrollToBottom()
+    })
+    .catch(() => {
+      bubble.innerHTML = ''
+      bubble.appendChild(buildTextAnswer('Ocurrió un problema procesando tu consulta. Intenta de nuevo.'))
+      scrollToBottom()
+    })
 }
 
 // ---------- Constructores de respuesta ----------
@@ -368,6 +461,38 @@ function buildTextAnswer(text) {
   return body
 }
 
+// Respuesta generada por IA (con distintivo)
+function buildAIAnswer(text) {
+  const wrap = el('div', { class: 'answer' })
+  wrap.appendChild(el('div', { class: 'answer-head' }, [
+    el('span', { class: 'cat-chip', style: { '--c': '#c084fc' } }, [
+      el('span', { class: 'cat-chip-icon', text: '🤖' }),
+      document.createTextNode('Respuesta IA'),
+    ]),
+  ]))
+  const body = el('div', { class: 'answer-body' })
+  body.appendChild(renderMarkdown(text))
+  wrap.appendChild(body)
+  return wrap
+}
+
+// Mensaje cuando se agota la cuota diaria
+function buildLimitReached() {
+  const plan = getPlan(me?.plan)
+  const wrap = el('div', { class: 'answer' })
+  wrap.appendChild(el('h2', { class: 'answer-title', text: 'Has alcanzado tu límite diario 🚦' }))
+  const body = el('div', { class: 'answer-body' })
+  body.appendChild(renderMarkdown(
+    `Tu plan **${plan.name}** incluye **${plan.dailyQueries === Infinity ? 'consultas ilimitadas' : plan.dailyQueries + ' consultas IA al día'}**. ` +
+    'Vuelve mañana o mejora tu plan para seguir consultando sin límites.\n\n' +
+    '💡 Mientras tanto, puedes seguir explorando la **base de conocimiento** por categorías y usar las **herramientas** disponibles en tu plan.',
+  ))
+  wrap.appendChild(body)
+  const btn = el('button', { class: 'plan-btn', style: { '--c': '#00f6ff', maxWidth: '240px' }, text: '⭐ Ver planes', onClick: () => openBilling(onUserChange) })
+  wrap.appendChild(btn)
+  return wrap
+}
+
 // ---------- Render de una respuesta del bot ----------
 function renderResponse(response) {
   switch (response.kind) {
@@ -382,14 +507,33 @@ function renderResponse(response) {
 }
 
 // ---------- Acciones ----------
-function send(textArg) {
+async function send(textArg) {
   const text = (textArg != null ? textArg : inputEl.value).trim()
   if (!text) return
+
+  // Control de cuota diaria
+  if (!canQuery(me)) {
+    addUserMessage(text)
+    inputEl.value = ''
+    autoGrow()
+    addBotMessage(() => buildLimitReached())
+    return
+  }
+
   addUserMessage(text)
   inputEl.value = ''
   autoGrow()
-  const response = getResponse(text)
-  addBotMessage(() => renderResponse(response))
+
+  // Consume una consulta y actualiza el contador
+  consume(me)
+  renderAccount()
+
+  // Intenta IA (si está configurada y hay red); si no, motor local. Nunca falla.
+  addBotMessageAsync(async () => {
+    const ai = await askAI(text)
+    if (ai && ai.text) return buildAIAnswer(ai.text)
+    return renderResponse(getResponse(text))
+  })
 }
 
 function openEntry(entryId) {
@@ -415,6 +559,26 @@ function openToolFromTag(name) {
 }
 
 // ---------- Init ----------
-buildLayout()
-addBotMessage(() => buildWelcome())
-inputEl.focus()
+function startApp(user) {
+  me = user
+  buildLayout()
+  addBotMessage(() => buildWelcome())
+  inputEl.focus()
+}
+
+function initAuthScreen() {
+  showAuth(document.getElementById('root'), (user) => startApp(user))
+}
+
+async function init() {
+  try {
+    await ensureSeed()
+  } catch {
+    /* si Web Crypto no está disponible, continúa con login vacío */
+  }
+  const user = currentUser()
+  if (user) startApp(user)
+  else initAuthScreen()
+}
+
+init()

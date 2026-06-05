@@ -1,9 +1,8 @@
 # 🛡️ CyberOracle · Asistente de Ciberseguridad
 
-Asistente conversacional **futurista** y **100% ético/defensivo** sobre ciberseguridad.
-Pregúntale lo que quieras (ataques y defensas, herramientas, criptografía, pentesting,
-nube, forense, certificaciones…) y te responde con explicaciones claras, herramientas
-recomendadas y buenas prácticas.
+Asistente conversacional **futurista** y **100% ético/defensivo** sobre ciberseguridad,
+con **login**, **planes de suscripción**, **panel de administración**, un **Arsenal de
+herramientas interactivas** y una **capa de IA opcional**.
 
 > Conocimiento **educativo y defensivo**. Practica solo en sistemas propios o autorizados.
 
@@ -11,75 +10,92 @@ recomendadas y buenas prácticas.
 
 ## ✨ Características
 
-- **45+ temas** organizados en **20 dominios** de seguridad.
-- Buscador inteligente con **sinónimos en español** (entiende preguntas naturales).
-- Interfaz **oscura futurista**: neón cian/violeta, glassmorphism, animaciones y efecto "escribiendo".
-- Navegación por dominios desde la barra lateral.
-- Sugerencias y temas relacionados con un clic.
-- Renderizado de Markdown **seguro** (sin `innerHTML` para contenido dinámico → sin XSS).
-- **Sin dependencias ni build**: JavaScript puro con módulos ES. Arranca al instante.
+- 🤖 **Asistente IA con respaldo local que nunca falla.** Si configuras una API (compatible
+  con OpenAI) y hay internet, responde con IA; si no, usa el **motor de conocimiento local**
+  (45+ temas, 20 dominios).
+- 🔐 **Login de usuario y administrador** (roles, hashing PBKDF2 con Web Crypto).
+- 💳 **3 planes de suscripción** con cuotas diarias y herramientas por plan:
+  | Plan | Precio | Consultas IA/día | Herramientas |
+  |------|--------|------------------|--------------|
+  | **Gratis** | $0 | 3 | 4 esenciales |
+  | **Pro** | $9.99/mes | 100 | casi todas |
+  | **Elite** | $24.99/mes | ∞ | todas |
+- 🛠️ **Panel de administración**: gestionar usuarios (plan, rol, suspender, eliminar),
+  estadísticas (usuarios, ingresos estimados, consultas) y configuración de la IA.
+- 🧰 **Arsenal con 19 herramientas interactivas** (funcionan 100% en el navegador).
+- 📖 **Cheat-sheets de 45+ herramientas CLI** (Nmap, sqlmap, Hydra, Hashcat, Nuclei…).
+- 🎨 Interfaz **oscura futurista**: neón, glassmorphism, animaciones.
+- 🧩 **Sin dependencias ni build**: JavaScript puro con módulos ES.
 
-## 🗂️ Dominios cubiertos
+## 🧰 Herramientas del Arsenal (client-side)
 
-Fundamentos · Seguridad Web (OWASP) · Redes · Criptografía · Pentesting · Herramientas ·
-Análisis de Malware · Forense Digital · Respuesta a Incidentes · Blue Team/SOC · Cloud ·
-Móvil · IoT/OT · Ingeniería Social · Active Directory · Frameworks (MITRE/NIST/ISO) ·
-Certificaciones · DevSecOps · Threat Intelligence · Carrera & Aprendizaje.
+Hash (SHA), HMAC, Base64/URL/Hex, conversor de bases, analizador de contraseñas,
+generador de contraseñas/frases, calculadora de entropía, decodificador y **firmador** de JWT,
+identificador de hash, UUID y tokens, conversor de timestamps, calculadora CIDR/subredes,
+César/ROT13, cifrado XOR, probador de regex, formateador JSON, analizador de cabeceras HTTP
+de seguridad y constructor de comandos Nmap.
+
+## 🔑 Acceso de demostración
+
+- **Administrador:** usuario `admin` · contraseña `admin123`
+- O **regístrate** para crear una cuenta nueva (empieza en el plan Gratis).
 
 ## 🚀 Cómo ejecutarlo
 
-La app usa **módulos ES**, así que necesita servirse por HTTP (no abrir el archivo directo).
-Elige cualquiera de estas opciones desde la carpeta del proyecto:
+La app usa **módulos ES**, así que necesita servirse por HTTP:
 
 ```bash
-# Opción A — Python (no requiere instalar nada)
-python3 -m http.server 5173
-
-# Opción B — Node (si lo tienes)
-npx serve .
-
-# Opción C — npm script incluido
-npm start
+python3 -m http.server 5173    # o:  npm start
 ```
 
-Luego abre en el navegador: **http://localhost:5173**
+Abre **http://localhost:5173**
+
+## 🤖 Activar la IA real (al desplegar con internet)
+
+1. Inicia sesión como **admin** → botón **🛠 (panel)** → pestaña **IA**.
+2. Activa la IA e introduce **endpoint**, **modelo** y **API key** (compatible con la API de OpenAI).
+3. Guarda. Sin esto, el asistente usa el motor de conocimiento local (siempre funcional).
 
 ## 📁 Estructura
 
 ```
-index.html              # punto de entrada
+index.html
 src/
-  app.js                # UI del chat (vanilla JS)
+  app.js                # UI del chat + integración (auth, cuota, IA)
   styles.css            # tema futurista
   lib/
+    dom.js              # helpers de DOM
     search.js           # motor de búsqueda + sinónimos
     bot.js              # lógica de respuesta / intención
     markdown.js         # renderizador Markdown seguro
+    tools.js            # lógica de las 19 herramientas + cheat-sheets
+    toolkit.js          # UI del Arsenal (con gating por plan)
+    plans.js            # definición de planes y permisos
+    store.js            # persistencia (localStorage)
+    auth.js             # registro/login/roles (PBKDF2)
+    quota.js            # control de consultas diarias
+    ai.js               # capa de IA con respaldo local
+    authUI.js           # pantalla de login/registro
+    billingUI.js        # planes / upgrade
+    adminUI.js          # panel de administración
   data/
-    categories.js       # los 20 dominios
-    knowledgeBase.js    # agregador de la base de conocimiento
+    categories.js       # 20 dominios
+    knowledgeBase.js    # agregador
     kb_part1..6.js       # entradas por dominio
-public/
-  shield.svg            # ícono
+public/shield.svg
 ```
 
-## 🧠 Cómo ampliar el conocimiento
+## ⚠️ Nota importante sobre seguridad (prototipo)
 
-Cada tema es un objeto en `src/data/kb_partX.js`:
+El **login y los pagos son un prototipo client-side** (datos en `localStorage`). Es ideal
+para demostración y desarrollo, pero **no es seguro para producción**: cualquiera con acceso
+al navegador podría manipularlo. Para un producto real:
 
-```js
-{
-  id: 'identificador-unico',
-  category: 'web',                 // id de una categoría existente
-  title: 'Título del tema',
-  keywords: ['palabras', 'clave'], // mejoran la búsqueda
-  summary: 'Resumen corto.',
-  content: `## Markdown soportado...`,
-  tools: ['Herramienta1', 'Herramienta2'],
-}
-```
+- Mueve **autenticación, usuarios y cuotas** a un **backend** (p. ej. Node + base de datos).
+- Integra **pagos reales** con una pasarela como **Stripe**.
+- Llama a la **API de IA desde el servidor** (no expongas la API key en el navegador).
 
-Añade nuevas entradas a cualquier parte y aparecerán automáticamente.
+El código está organizado en módulos para facilitar esa migración.
 
 ---
 

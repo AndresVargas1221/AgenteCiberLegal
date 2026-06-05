@@ -259,11 +259,23 @@ export function buildNmap(opts = {}) {
 // ---------------- Metadatos de herramientas interactivas ----------------
 export const INTERACTIVE_TOOLS = [
   { id: 'hash', name: 'Generador de Hash', icon: '#', color: '#00f6ff', desc: 'SHA-1/256/384/512 de cualquier texto' },
+  { id: 'hmac', name: 'Generador HMAC', icon: '⊟', color: '#00f6ff', desc: 'HMAC-SHA256/384/512 con clave' },
   { id: 'encoder', name: 'Codificar / Decodificar', icon: '⇄', color: '#33ff99', desc: 'Base64 · URL · Hex' },
+  { id: 'base', name: 'Conversor de Bases', icon: '⟐', color: '#33ff99', desc: 'Binario · Octal · Decimal · Hex' },
   { id: 'pwcheck', name: 'Analizador de Contraseñas', icon: '◆', color: '#ff4d6d', desc: 'Entropía y tiempo de crackeo' },
   { id: 'pwgen', name: 'Generador de Contraseñas', icon: '⚿', color: '#c084fc', desc: 'Aleatoriedad criptográfica' },
+  { id: 'entropy', name: 'Calculadora de Entropía', icon: '∿', color: '#c084fc', desc: 'Entropía de Shannon de un texto' },
   { id: 'jwt', name: 'Decodificador JWT', icon: '⬡', color: '#fbbf24', desc: 'Inspecciona header y payload' },
+  { id: 'jwtsign', name: 'Firmador JWT (HS256)', icon: '✶', color: '#fbbf24', desc: 'Genera un JWT firmado' },
   { id: 'hashid', name: 'Identificador de Hash', icon: '?', color: '#38bdf8', desc: 'Detecta el tipo de hash' },
+  { id: 'uuid', name: 'UUID & Tokens', icon: '⧉', color: '#38bdf8', desc: 'UUID v4 y tokens seguros' },
+  { id: 'timestamp', name: 'Conversor de Timestamps', icon: '◷', color: '#60a5fa', desc: 'Epoch ⇄ fecha' },
+  { id: 'cidr', name: 'Calculadora CIDR', icon: '⊞', color: '#22d3ee', desc: 'Subredes, rango y hosts' },
+  { id: 'rot', name: 'César / ROT13', icon: '↻', color: '#a78bfa', desc: 'Cifrado por desplazamiento' },
+  { id: 'xor', name: 'Cifrado XOR', icon: '⊕', color: '#a78bfa', desc: 'XOR con clave (hex)' },
+  { id: 'regex', name: 'Probador de Regex', icon: '⋙', color: '#f472b6', desc: 'Prueba expresiones regulares' },
+  { id: 'json', name: 'Formateador JSON', icon: '{}', color: '#f472b6', desc: 'Valida y embellece JSON' },
+  { id: 'httpheaders', name: 'Analizador de Cabeceras', icon: '⛨', color: '#33ff99', desc: 'Evalúa headers de seguridad' },
   { id: 'nmap', name: 'Constructor Nmap', icon: '⌖', color: '#ff7a18', desc: 'Genera el comando (no lo ejecuta)' },
 ]
 
@@ -390,6 +402,116 @@ export const TOOL_REFERENCE = {
     url: 'https://github.com/gitleaks/gitleaks',
     examples: ['gitleaks detect --source .'],
   },
+  Nuclei: {
+    what: 'Escáner de vulnerabilidades basado en plantillas (YAML).',
+    url: 'https://docs.projectdiscovery.io/tools/nuclei',
+    examples: ['nuclei -u https://t', 'nuclei -l urls.txt -t cves/'],
+  },
+  Subfinder: {
+    what: 'Descubrimiento pasivo y rápido de subdominios.',
+    url: 'https://docs.projectdiscovery.io/tools/subfinder',
+    examples: ['subfinder -d dominio.com'],
+  },
+  httpx: {
+    what: 'Sondeo HTTP rápido para validar hosts vivos y tecnologías.',
+    url: 'https://docs.projectdiscovery.io/tools/httpx',
+    examples: ['httpx -l hosts.txt -title -tech-detect'],
+  },
+  masscan: {
+    what: 'Escáner de puertos masivo y muy rápido.',
+    url: 'https://github.com/robertdavidgraham/masscan',
+    examples: ['masscan -p1-65535 10.0.0.0/24 --rate 1000'],
+  },
+  Netcat: {
+    what: 'Navaja suiza de red: conexiones TCP/UDP, transferencia, listeners.',
+    url: 'https://nmap.org/ncat/',
+    examples: ['nc -lvnp 4444', 'nc target 80'],
+  },
+  Nessus: {
+    what: 'Escáner de vulnerabilidades comercial muy usado en empresas.',
+    url: 'https://docs.tenable.com/',
+    examples: ['Crea una política y lanza un scan desde la web'],
+  },
+  OpenVAS: {
+    what: 'Escáner de vulnerabilidades open source (Greenbone).',
+    url: 'https://www.greenbone.net/en/',
+    examples: ['Configura objetivos y tareas desde la GUI'],
+  },
+  'Aircrack-ng': {
+    what: 'Suite de auditoría de redes WiFi (en redes propias).',
+    url: 'https://www.aircrack-ng.org/documentation.html',
+    examples: ['airodump-ng wlan0mon', 'aircrack-ng -w wordlist cap.cap'],
+  },
+  Impacket: {
+    what: 'Colección de scripts Python para protocolos de red (SMB, Kerberos).',
+    url: 'https://github.com/fortra/impacket',
+    examples: ['secretsdump.py dom/user@host', 'psexec.py dom/user@host'],
+  },
+  CrackMapExec: {
+    what: 'Post-explotación y enumeración masiva en redes Windows/AD.',
+    url: 'https://www.crackmapexec.wiki/',
+    examples: ['crackmapexec smb 10.0.0.0/24 -u u -p p'],
+  },
+  Responder: {
+    what: 'Envenenamiento LLMNR/NBT-NS para capturar credenciales (lab/autorizado).',
+    url: 'https://github.com/lgandx/Responder',
+    examples: ['responder -I eth0'],
+  },
+  enum4linux: {
+    what: 'Enumeración de información SMB/Samba en hosts.',
+    url: 'https://github.com/CiscoCXSecurity/enum4linux',
+    examples: ['enum4linux -a 10.0.0.5'],
+  },
+  Wfuzz: {
+    what: 'Fuzzer web para fuerza bruta de parámetros y rutas.',
+    url: 'https://wfuzz.readthedocs.io/',
+    examples: ['wfuzz -w wl.txt https://t/FUZZ'],
+  },
+  Binwalk: {
+    what: 'Análisis y extracción de firmware e imágenes binarias.',
+    url: 'https://github.com/ReFirmLabs/binwalk',
+    examples: ['binwalk -e firmware.bin'],
+  },
+  Frida: {
+    what: 'Instrumentación dinámica para apps (móvil/escritorio).',
+    url: 'https://frida.re/docs/home/',
+    examples: ['frida-trace -U -i "open" app'],
+  },
+  MobSF: {
+    what: 'Análisis automático de seguridad para apps móviles.',
+    url: 'https://mobsf.github.io/docs/',
+    examples: ['Sube el APK/IPA a la interfaz web'],
+  },
+  CyberChef: {
+    what: '"Navaja suiza" web para codificar, cifrar y analizar datos.',
+    url: 'https://gchq.github.io/CyberChef/',
+    examples: ['Arrastra operaciones para construir una "receta"'],
+  },
+  Autopsy: {
+    what: 'Plataforma forense de disco con interfaz gráfica.',
+    url: 'https://www.autopsy.com/',
+    examples: ['Crea un caso e ingiere una imagen de disco'],
+  },
+  Mimikatz: {
+    what: 'Extrae credenciales en Windows (uso defensivo/autorizado).',
+    url: 'https://github.com/gentilkiwi/mimikatz',
+    examples: ['sekurlsa::logonpasswords'],
+  },
+  Snort: {
+    what: 'IDS/IPS open source basado en firmas.',
+    url: 'https://www.snort.org/documents',
+    examples: ['snort -c snort.conf -i eth0'],
+  },
+  Suricata: {
+    what: 'IDS/IPS de alto rendimiento, multihilo.',
+    url: 'https://docs.suricata.io/',
+    examples: ['suricata -c suricata.yaml -i eth0'],
+  },
+  Zeek: {
+    what: 'Monitor de red para análisis y detección (antes Bro).',
+    url: 'https://docs.zeek.org/',
+    examples: ['zeek -i eth0', 'zeek -r captura.pcap'],
+  },
 }
 
 // Resuelve una etiqueta de herramienta a una acción del Arsenal.
@@ -407,4 +529,226 @@ export function resolveToolTag(name) {
     if (key.toLowerCase() === n) return { type: 'ref', name: key }
   }
   return { type: 'none', name }
+}
+
+
+// =============================================================
+// CyberOracle · Arsenal — Herramientas adicionales (v2)
+// Todo client-side. Web Crypto donde aplica.
+// =============================================================
+
+// ---------- Utilidades base64url ----------
+function b64urlFromBytes(bytes) {
+  let bin = ''
+  bytes.forEach((b) => (bin += String.fromCharCode(b)))
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+function b64urlFromStr(str) {
+  return b64urlFromBytes(new TextEncoder().encode(str))
+}
+
+// ---------- HMAC (Web Crypto) ----------
+export async function hmacHex(hashName, key, msg) {
+  const enc = new TextEncoder()
+  const k = await crypto.subtle.importKey('raw', enc.encode(key), { name: 'HMAC', hash: hashName }, false, ['sign'])
+  const sig = await crypto.subtle.sign('HMAC', k, enc.encode(msg))
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+// ---------- Firmador de JWT (HS256/384/512) ----------
+export async function signJWT(payloadObj, secret, alg = 'HS256') {
+  const header = { alg, typ: 'JWT' }
+  const h = b64urlFromStr(JSON.stringify(header))
+  const p = b64urlFromStr(JSON.stringify(payloadObj))
+  const data = `${h}.${p}`
+  const hashName = alg === 'HS512' ? 'SHA-512' : alg === 'HS384' ? 'SHA-384' : 'SHA-256'
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: hashName }, false, ['sign'])
+  const sig = await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(data))
+  return `${data}.${b64urlFromBytes(new Uint8Array(sig))}`
+}
+
+// ---------- Calculadora CIDR / Subred ----------
+export function cidrInfo(input) {
+  const raw = (input || '').trim()
+  const [ip, bitsStr] = raw.split('/')
+  const bits = parseInt(bitsStr, 10)
+  if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip || '') || isNaN(bits) || bits < 0 || bits > 32) {
+    return { error: 'Formato esperado: 192.168.1.0/24' }
+  }
+  const octs = ip.split('.').map(Number)
+  if (octs.some((o) => o < 0 || o > 255)) return { error: 'Octetos fuera de rango (0-255).' }
+  const ipNum = (((octs[0] << 24) >>> 0) + (octs[1] << 16) + (octs[2] << 8) + octs[3]) >>> 0
+  const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0
+  const network = (ipNum & mask) >>> 0
+  const broadcast = (network | (~mask >>> 0)) >>> 0
+  const toIp = (n) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join('.')
+  const hostBits = 32 - bits
+  const total = Math.pow(2, hostBits)
+  const usable = bits >= 31 ? (bits === 32 ? 1 : 2) : total - 2
+  const first = bits >= 31 ? network : (network + 1) >>> 0
+  const last = bits >= 31 ? broadcast : (broadcast - 1) >>> 0
+  return {
+    cidr: `/${bits}`,
+    network: toIp(network),
+    broadcast: toIp(broadcast),
+    mask: toIp(mask),
+    wildcard: toIp(~mask >>> 0),
+    first: toIp(first),
+    last: toIp(last),
+    totalHosts: total,
+    usableHosts: usable,
+  }
+}
+
+// ---------- Conversor de timestamps ----------
+export function timestampInfo(input) {
+  const v = (input || '').trim()
+  if (!v) return null
+  let date
+  if (/^\d+$/.test(v)) {
+    const n = Number(v)
+    date = new Date(v.length > 10 ? n : n * 1000)
+  } else {
+    const t = Date.parse(v)
+    if (isNaN(t)) return { error: 'Fecha no reconocida. Prueba ISO o un epoch.' }
+    date = new Date(t)
+  }
+  if (isNaN(date.getTime())) return { error: 'Valor inválido.' }
+  return {
+    iso: date.toISOString(),
+    local: date.toLocaleString(),
+    utc: date.toUTCString(),
+    epochSec: Math.floor(date.getTime() / 1000),
+    epochMs: date.getTime(),
+    relative: relativeTime(date.getTime()),
+  }
+}
+function relativeTime(ms) {
+  const diff = (ms - Date.now()) / 1000
+  const abs = Math.abs(diff)
+  const fut = diff > 0
+  let val, unit
+  if (abs < 60) { val = Math.round(abs); unit = 'segundos' }
+  else if (abs < 3600) { val = Math.round(abs / 60); unit = 'minutos' }
+  else if (abs < 86400) { val = Math.round(abs / 3600); unit = 'horas' }
+  else if (abs < 2629800) { val = Math.round(abs / 86400); unit = 'días' }
+  else if (abs < 31557600) { val = Math.round(abs / 2629800); unit = 'meses' }
+  else { val = Math.round(abs / 31557600); unit = 'años' }
+  return fut ? `dentro de ${val} ${unit}` : `hace ${val} ${unit}`
+}
+
+// ---------- UUID y tokens aleatorios ----------
+export function uuidv4() {
+  if (crypto.randomUUID) return crypto.randomUUID()
+  const a = new Uint8Array(16)
+  crypto.getRandomValues(a)
+  a[6] = (a[6] & 0x0f) | 0x40
+  a[8] = (a[8] & 0x3f) | 0x80
+  const h = [...a].map((b) => b.toString(16).padStart(2, '0'))
+  return `${h.slice(0, 4).join('')}-${h.slice(4, 6).join('')}-${h.slice(6, 8).join('')}-${h.slice(8, 10).join('')}-${h.slice(10, 16).join('')}`
+}
+export function randomToken(bytes = 32, fmt = 'hex') {
+  const a = new Uint8Array(bytes)
+  crypto.getRandomValues(a)
+  if (fmt === 'hex') return [...a].map((b) => b.toString(16).padStart(2, '0')).join('')
+  if (fmt === 'base64url') return b64urlFromBytes(a)
+  let bin = ''
+  a.forEach((b) => (bin += String.fromCharCode(b)))
+  return btoa(bin)
+}
+
+// ---------- Conversor de bases numéricas ----------
+export function convertBase(value, fromBase) {
+  const n = parseInt((value || '').trim(), fromBase)
+  if (isNaN(n)) return { error: 'Número inválido para la base elegida.' }
+  return {
+    bin: n.toString(2),
+    oct: n.toString(8),
+    dec: n.toString(10),
+    hex: n.toString(16).toUpperCase(),
+  }
+}
+
+// ---------- Entropía de Shannon ----------
+export function shannonEntropy(str) {
+  if (!str) return { perChar: 0, bits: 0, len: 0 }
+  const freq = {}
+  for (const ch of str) freq[ch] = (freq[ch] || 0) + 1
+  let H = 0
+  const len = str.length
+  for (const k in freq) {
+    const p = freq[k] / len
+    H -= p * Math.log2(p)
+  }
+  return { perChar: H, bits: H * len, len }
+}
+
+// ---------- Cifrado César / ROT ----------
+export function caesar(str, shift) {
+  const s = ((shift % 26) + 26) % 26
+  return (str || '').replace(/[a-z]/gi, (c) => {
+    const base = c <= 'Z' ? 65 : 97
+    return String.fromCharCode(((c.charCodeAt(0) - base + s) % 26) + base)
+  })
+}
+
+// ---------- Cifrado XOR (clave de texto) ----------
+export function xorToHex(text, key) {
+  if (!key) return ''
+  const tb = new TextEncoder().encode(text)
+  const kb = new TextEncoder().encode(key)
+  const out = tb.map((b, i) => b ^ kb[i % kb.length])
+  return [...out].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+export function xorFromHex(hex, key) {
+  if (!key) return ''
+  const bytes = (hex.replace(/[^0-9a-fA-F]/g, '').match(/.{1,2}/g) || []).map((h) => parseInt(h, 16))
+  const kb = new TextEncoder().encode(key)
+  const out = bytes.map((b, i) => b ^ kb[i % kb.length])
+  return new TextDecoder().decode(Uint8Array.from(out))
+}
+
+// ---------- Probador de Regex ----------
+export function testRegex(pattern, flags, text) {
+  try {
+    const gflags = flags.includes('g') ? flags : flags + 'g'
+    const re = new RegExp(pattern, gflags)
+    const matches = [...(text || '').matchAll(re)].map((m) => m[0])
+    return { ok: true, count: matches.length, matches: matches.slice(0, 200) }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+}
+
+// ---------- Formateador / validador JSON ----------
+export function formatJSON(str) {
+  try {
+    const obj = JSON.parse(str)
+    return { ok: true, pretty: JSON.stringify(obj, null, 2) }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+}
+
+// ---------- Analizador de cabeceras HTTP de seguridad ----------
+export function analyzeHeaders(raw) {
+  const map = {}
+  ;(raw || '').split('\n').forEach((l) => {
+    const i = l.indexOf(':')
+    if (i > 0) map[l.slice(0, i).trim().toLowerCase()] = l.slice(i + 1).trim()
+  })
+  const checks = [
+    { key: 'strict-transport-security', name: 'Strict-Transport-Security (HSTS)', good: 'Fuerza HTTPS' },
+    { key: 'content-security-policy', name: 'Content-Security-Policy (CSP)', good: 'Mitiga XSS/inyección' },
+    { key: 'x-content-type-options', name: 'X-Content-Type-Options', good: 'Evita MIME sniffing' },
+    { key: 'x-frame-options', name: 'X-Frame-Options', good: 'Anti-clickjacking' },
+    { key: 'referrer-policy', name: 'Referrer-Policy', good: 'Controla el Referer' },
+    { key: 'permissions-policy', name: 'Permissions-Policy', good: 'Limita APIs del navegador' },
+  ]
+  const results = checks.map((c) => ({ name: c.name, present: !!map[c.key], value: map[c.key] || '', good: c.good }))
+  const score = Math.round((results.filter((r) => r.present).length / checks.length) * 100)
+  const warns = []
+  if (map['server']) warns.push('La cabecera "Server" revela software: ' + map['server'])
+  if (map['x-powered-by']) warns.push('"X-Powered-By" revela tecnología: ' + map['x-powered-by'])
+  return { results, score, warns }
 }

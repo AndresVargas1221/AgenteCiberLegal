@@ -2,6 +2,9 @@
 // CyberOracle · Arsenal — Interfaz (modal con herramientas interactivas)
 // =============================================================
 import { el, copyToClipboard } from './dom.js'
+import { currentUser } from './auth.js'
+import { canUseTool } from './plans.js'
+import { openBilling } from './billingUI.js'
 import {
   INTERACTIVE_TOOLS,
   TOOL_REFERENCE,
@@ -12,6 +15,9 @@ import {
   decodeJWT,
   identifyHash,
   buildNmap,
+  hmacHex, signJWT, cidrInfo, timestampInfo,
+  uuidv4, randomToken, convertBase, shannonEntropy,
+  caesar, xorToHex, xorFromHex, testRegex, formatJSON, analyzeHeaders,
 } from './tools.js'
 
 let overlayEl = null
@@ -372,15 +378,331 @@ function renderReference(panel, filterName) {
 }
 
 // ============================================================
+// Render de herramientas nuevas (v2)
+// ============================================================
+
+function renderHmac(panel) {
+  const hashSel = el('select', { class: 'tk-select' }, [
+    el('option', { value: 'SHA-256', text: 'HMAC-SHA256' }),
+    el('option', { value: 'SHA-384', text: 'HMAC-SHA384' }),
+    el('option', { value: 'SHA-512', text: 'HMAC-SHA512' }),
+  ])
+  const key = el('input', { class: 'tk-input tk-mono', type: 'text', placeholder: 'Clave secreta' })
+  const msg = el('textarea', { class: 'tk-textarea', rows: '3', placeholder: 'Mensaje a autenticar…' })
+  const out = el('code', { class: 'tk-hash-val' })
+  async function update() {
+    if (!key.value || !msg.value) { out.textContent = '(introduce clave y mensaje)'; return }
+    out.textContent = await hmacHex(hashSel.value, key.value, msg.value)
+  }
+  ;[key, msg].forEach((n) => n.addEventListener('input', update))
+  hashSel.addEventListener('change', update)
+  panel.appendChild(field('Algoritmo', hashSel))
+  panel.appendChild(field('Clave', key))
+  panel.appendChild(field('Mensaje', msg))
+  const outF = el('div', { class: 'tk-field' }, [el('label', { class: 'tk-label', text: 'HMAC (hex)' }), el('div', { class: 'tk-cmd-wrap' }, [out])])
+  outF.appendChild(copyBtn(() => out.textContent))
+  panel.appendChild(outF)
+  update()
+}
+
+function renderJwtSign(panel) {
+  const alg = el('select', { class: 'tk-select' }, [
+    el('option', { value: 'HS256', text: 'HS256' }),
+    el('option', { value: 'HS384', text: 'HS384' }),
+    el('option', { value: 'HS512', text: 'HS512' }),
+  ])
+  const payload = el('textarea', { class: 'tk-textarea tk-mono', rows: '5', text: '{\n  "sub": "1234",\n  "name": "Ada",\n  "role": "user"\n}' })
+  const secret = el('input', { class: 'tk-input tk-mono', type: 'text', value: 'mi-clave-secreta' })
+  const out = el('code', { class: 'tk-cmd' })
+  async function update() {
+    try {
+      const obj = JSON.parse(payload.value)
+      out.textContent = await signJWT(obj, secret.value, alg.value)
+    } catch {
+      out.textContent = '⚠ El payload debe ser JSON válido.'
+    }
+  }
+  ;[payload, secret].forEach((n) => n.addEventListener('input', update))
+  alg.addEventListener('change', update)
+  panel.appendChild(field('Algoritmo', alg))
+  panel.appendChild(field('Payload (JSON)', payload))
+  panel.appendChild(field('Secreto (HMAC)', secret))
+  const outF = el('div', { class: 'tk-field' }, [el('label', { class: 'tk-label', text: 'JWT firmado' }), el('div', { class: 'tk-cmd-wrap' }, [out])])
+  outF.appendChild(copyBtn(() => out.textContent))
+  panel.appendChild(outF)
+  panel.appendChild(el('div', { class: 'tk-note', text: 'Genera tokens para pruebas en TUS propias aplicaciones.' }))
+  update()
+}
+
+function renderCidr(panel) {
+  const input = el('input', { class: 'tk-input tk-mono', type: 'text', value: '192.168.1.0/24' })
+  const out = el('div', { class: 'tk-results' })
+  function row(label, value) {
+    return el('div', { class: 'tk-hash-row' }, [
+      el('span', { class: 'tk-hash-algo', text: label }),
+      el('code', { class: 'tk-hash-val', text: String(value) }),
+    ])
+  }
+  function update() {
+    out.innerHTML = ''
+    const r = cidrInfo(input.value)
+    if (r.error) { out.appendChild(el('div', { class: 'tk-warn' }, [el('span', { class: 'tk-warn-icon', text: '⚠' }), el('span', { text: r.error })])); return }
+    out.appendChild(row('Red', r.network + r.cidr))
+    out.appendChild(row('Máscara', r.mask))
+    out.appendChild(row('Wildcard', r.wildcard))
+    out.appendChild(row('Broadcast', r.broadcast))
+    out.appendChild(row('Rango útil', `${r.first}  –  ${r.last}`))
+    out.appendChild(row('Hosts útiles', r.usableHosts.toLocaleString()))
+    out.appendChild(row('Total dir.', r.totalHosts.toLocaleString()))
+  }
+  input.addEventListener('input', update)
+  panel.appendChild(field('Red en notación CIDR', input, 'Ejemplo: 10.0.0.0/8, 192.168.1.0/24'))
+  panel.appendChild(out)
+  update()
+}
+
+function renderTimestamp(panel) {
+  const input = el('input', { class: 'tk-input tk-mono', type: 'text', placeholder: 'Epoch (seg/ms) o fecha ISO…' })
+  const nowBtn = el('button', { class: 'tk-btn', text: '⌚ Ahora', onClick: () => { input.value = String(Math.floor(Date.now() / 1000)); update() } })
+  const out = el('div', { class: 'tk-results' })
+  function row(label, value) {
+    return el('div', { class: 'tk-hash-row' }, [
+      el('span', { class: 'tk-hash-algo', text: label }),
+      el('code', { class: 'tk-hash-val', text: String(value) }),
+      copyBtn(() => String(value), '⎘'),
+    ])
+  }
+  function update() {
+    out.innerHTML = ''
+    const r = timestampInfo(input.value)
+    if (!r) { out.appendChild(el('div', { class: 'tk-empty', text: 'Introduce un valor o pulsa "Ahora".' })); return }
+    if (r.error) { out.appendChild(el('div', { class: 'tk-warn' }, [el('span', { class: 'tk-warn-icon', text: '⚠' }), el('span', { text: r.error })])); return }
+    out.appendChild(row('Epoch (s)', r.epochSec))
+    out.appendChild(row('Epoch (ms)', r.epochMs))
+    out.appendChild(row('ISO 8601', r.iso))
+    out.appendChild(row('UTC', r.utc))
+    out.appendChild(row('Local', r.local))
+    out.appendChild(row('Relativo', r.relative))
+  }
+  input.addEventListener('input', update)
+  const f = field('Valor', input)
+  f.appendChild(el('div', { class: 'tk-btnrow' }, [nowBtn]))
+  panel.appendChild(f)
+  panel.appendChild(out)
+  update()
+}
+
+function renderUuid(panel) {
+  const uuidOut = el('input', { class: 'tk-input tk-mono', type: 'text', readonly: 'readonly' })
+  function genU() { uuidOut.value = uuidv4() }
+  const uF = field('UUID v4', uuidOut)
+  uF.appendChild(el('div', { class: 'tk-btnrow' }, [el('button', { class: 'tk-btn', text: '↻ Generar UUID', onClick: genU }), copyBtn(() => uuidOut.value)]))
+  panel.appendChild(uF)
+
+  panel.appendChild(el('div', { class: 'tk-divider' }))
+
+  const bytesVal = el('span', { class: 'tk-range-val', text: '32' })
+  const bytes = el('input', { class: 'tk-range', type: 'range', min: '8', max: '64', value: '32' })
+  const fmt = el('select', { class: 'tk-select' }, [
+    el('option', { value: 'hex', text: 'Hexadecimal' }),
+    el('option', { value: 'base64url', text: 'Base64URL' }),
+    el('option', { value: 'base64', text: 'Base64' }),
+  ])
+  const tokOut = el('input', { class: 'tk-input tk-mono', type: 'text', readonly: 'readonly' })
+  function genT() { tokOut.value = randomToken(Number(bytes.value), fmt.value) }
+  bytes.addEventListener('input', () => { bytesVal.textContent = bytes.value; genT() })
+  fmt.addEventListener('change', genT)
+  panel.appendChild(field('Tamaño del token (bytes)', el('div', { class: 'tk-range-wrap' }, [bytes, bytesVal])))
+  panel.appendChild(field('Formato', fmt))
+  const tF = field('Token aleatorio seguro', tokOut)
+  tF.appendChild(el('div', { class: 'tk-btnrow' }, [el('button', { class: 'tk-btn', text: '↻ Generar token', onClick: genT }), copyBtn(() => tokOut.value)]))
+  panel.appendChild(tF)
+  genU()
+  genT()
+}
+
+function renderBase(panel) {
+  const fromBase = el('select', { class: 'tk-select' }, [
+    el('option', { value: '10', text: 'Decimal' }),
+    el('option', { value: '2', text: 'Binario' }),
+    el('option', { value: '8', text: 'Octal' }),
+    el('option', { value: '16', text: 'Hexadecimal' }),
+  ])
+  const input = el('input', { class: 'tk-input tk-mono', type: 'text', placeholder: 'Introduce un número…' })
+  const out = el('div', { class: 'tk-results' })
+  function row(label, value) {
+    return el('div', { class: 'tk-hash-row' }, [
+      el('span', { class: 'tk-hash-algo', text: label }),
+      el('code', { class: 'tk-hash-val', text: value }),
+      copyBtn(() => value, '⎘'),
+    ])
+  }
+  function update() {
+    out.innerHTML = ''
+    if (!input.value.trim()) { out.appendChild(el('div', { class: 'tk-empty', text: 'El resultado en todas las bases aparecerá aquí.' })); return }
+    const r = convertBase(input.value, Number(fromBase.value))
+    if (r.error) { out.appendChild(el('div', { class: 'tk-warn' }, [el('span', { class: 'tk-warn-icon', text: '⚠' }), el('span', { text: r.error })])); return }
+    out.appendChild(row('Binario', r.bin))
+    out.appendChild(row('Octal', r.oct))
+    out.appendChild(row('Decimal', r.dec))
+    out.appendChild(row('Hex', r.hex))
+  }
+  ;[input].forEach((n) => n.addEventListener('input', update))
+  fromBase.addEventListener('change', update)
+  panel.appendChild(field('Base de entrada', fromBase))
+  panel.appendChild(field('Número', input))
+  panel.appendChild(out)
+  update()
+}
+
+function renderEntropy(panel) {
+  const input = el('textarea', { class: 'tk-textarea', rows: '3', placeholder: 'Texto para medir su entropía de Shannon…' })
+  const stats = el('div', { class: 'tk-stats' })
+  function update() {
+    const r = shannonEntropy(input.value)
+    stats.innerHTML = ''
+    stats.appendChild(el('div', { class: 'tk-stat' }, [el('b', { text: r.perChar.toFixed(2) }), document.createTextNode(' bits/carácter')]))
+    stats.appendChild(el('div', { class: 'tk-stat' }, [el('b', { text: Math.round(r.bits) + '' }), document.createTextNode(' bits totales')]))
+    stats.appendChild(el('div', { class: 'tk-stat' }, [el('b', { text: String(r.len) }), document.createTextNode(' caracteres')]))
+  }
+  input.addEventListener('input', update)
+  panel.appendChild(field('Texto', input, 'La entropía de Shannon mide la imprevisibilidad de los datos.'))
+  panel.appendChild(stats)
+  update()
+}
+
+function renderRot(panel) {
+  const input = el('textarea', { class: 'tk-textarea', rows: '3', placeholder: 'Texto a cifrar/descifrar…' })
+  const shiftVal = el('span', { class: 'tk-range-val', text: '13' })
+  const shift = el('input', { class: 'tk-range', type: 'range', min: '0', max: '25', value: '13' })
+  const out = el('textarea', { class: 'tk-textarea tk-output', rows: '3', readonly: 'readonly' })
+  function update() { out.value = caesar(input.value, Number(shift.value)) }
+  input.addEventListener('input', update)
+  shift.addEventListener('input', () => { shiftVal.textContent = shift.value; update() })
+  panel.appendChild(field('Entrada', input))
+  panel.appendChild(field('Desplazamiento (13 = ROT13)', el('div', { class: 'tk-range-wrap' }, [shift, shiftVal])))
+  const outF = field('Salida', out)
+  outF.appendChild(copyBtn(() => out.value))
+  panel.appendChild(outF)
+  update()
+}
+
+function renderXor(panel) {
+  const dir = el('select', { class: 'tk-select' }, [
+    el('option', { value: 'enc', text: 'Texto → XOR (hex)' }),
+    el('option', { value: 'dec', text: 'XOR (hex) → Texto' }),
+  ])
+  const key = el('input', { class: 'tk-input tk-mono', type: 'text', placeholder: 'Clave', value: 'clave' })
+  const input = el('textarea', { class: 'tk-textarea tk-mono', rows: '3', placeholder: 'Entrada…' })
+  const out = el('textarea', { class: 'tk-textarea tk-output tk-mono', rows: '3', readonly: 'readonly' })
+  function update() {
+    try {
+      out.value = dir.value === 'enc' ? xorToHex(input.value, key.value) : xorFromHex(input.value, key.value)
+    } catch { out.value = '⚠ Entrada inválida.' }
+  }
+  ;[key, input].forEach((n) => n.addEventListener('input', update))
+  dir.addEventListener('change', update)
+  panel.appendChild(field('Dirección', dir))
+  panel.appendChild(field('Clave', key))
+  panel.appendChild(field('Entrada', input))
+  const outF = field('Salida', out)
+  outF.appendChild(copyBtn(() => out.value))
+  panel.appendChild(outF)
+  panel.appendChild(el('div', { class: 'tk-note', text: 'XOR es educativo; no es cifrado seguro por sí solo.' }))
+  update()
+}
+
+function renderRegex(panel) {
+  const pattern = el('input', { class: 'tk-input tk-mono', type: 'text', placeholder: 'Patrón, p. ej. \\d{3}-\\d{4}' })
+  const flags = el('input', { class: 'tk-input tk-mono', type: 'text', value: 'gi', placeholder: 'flags (g,i,m,s)' })
+  const text = el('textarea', { class: 'tk-textarea', rows: '4', placeholder: 'Texto donde buscar…' })
+  const out = el('div', { class: 'tk-results' })
+  function update() {
+    out.innerHTML = ''
+    if (!pattern.value || !text.value) { out.appendChild(el('div', { class: 'tk-empty', text: 'Las coincidencias aparecerán aquí.' })); return }
+    const r = testRegex(pattern.value, flags.value || '', text.value)
+    if (!r.ok) { out.appendChild(el('div', { class: 'tk-warn' }, [el('span', { class: 'tk-warn-icon', text: '⚠' }), el('span', { text: 'Regex inválida: ' + r.error })])); return }
+    out.appendChild(el('div', { class: 'tk-stat' }, [el('b', { text: String(r.count) }), document.createTextNode(' coincidencias')]))
+    if (r.matches.length) out.appendChild(el('div', { class: 'tk-tags' }, r.matches.map((m) => el('span', { class: 'tk-tag', text: m || '(vacío)' }))))
+  }
+  ;[pattern, flags, text].forEach((n) => n.addEventListener('input', update))
+  panel.appendChild(el('div', { class: 'tk-row2' }, [field('Patrón', pattern), field('Flags', flags)]))
+  panel.appendChild(field('Texto', text))
+  panel.appendChild(out)
+  update()
+}
+
+function renderJson(panel) {
+  const input = el('textarea', { class: 'tk-textarea tk-mono', rows: '6', placeholder: 'Pega JSON aquí…' })
+  const out = el('pre', { class: 'tk-jwt-pre' }, [el('code', { class: 'tk-json-out' })])
+  const codeEl = out.querySelector('code')
+  const status = el('div', { class: 'adm-ai-status' })
+  function update() {
+    if (!input.value.trim()) { codeEl.textContent = ''; status.textContent = ''; return }
+    const r = formatJSON(input.value)
+    if (!r.ok) { codeEl.textContent = ''; status.textContent = '⚠ JSON inválido: ' + r.error; status.className = 'adm-ai-status err'; return }
+    codeEl.textContent = r.pretty
+    status.textContent = '✓ JSON válido'
+    status.className = 'adm-ai-status ok'
+  }
+  input.addEventListener('input', update)
+  panel.appendChild(field('Entrada', input))
+  panel.appendChild(status)
+  const outF = el('div', { class: 'tk-field' }, [el('label', { class: 'tk-label', text: 'Formateado' }), out])
+  outF.appendChild(copyBtn(() => codeEl.textContent))
+  panel.appendChild(outF)
+}
+
+function renderHttpHeaders(panel) {
+  const input = el('textarea', { class: 'tk-textarea tk-mono', rows: '6', placeholder: 'Pega las cabeceras de respuesta HTTP…\nEj:\nStrict-Transport-Security: max-age=63072000\nContent-Security-Policy: default-src \'self\'' })
+  const out = el('div', {})
+  function update() {
+    out.innerHTML = ''
+    if (!input.value.trim()) { out.appendChild(el('div', { class: 'tk-empty', text: 'El análisis aparecerá aquí.' })); return }
+    const r = analyzeHeaders(input.value)
+    const color = r.score >= 80 ? '#33ff99' : r.score >= 50 ? '#fbbf24' : '#ff4d6d'
+    out.appendChild(el('div', { class: 'tk-score', style: { '--c': color } }, [
+      el('span', { class: 'tk-score-num', text: r.score + '%' }),
+      el('span', { class: 'tk-score-label', text: 'cabeceras de seguridad presentes' }),
+    ]))
+    const list = el('div', { class: 'tk-results' })
+    r.results.forEach((c) => {
+      list.appendChild(el('div', { class: 'tk-hash-row' }, [
+        el('span', { class: 'tk-hash-algo', style: { color: c.present ? '#33ff99' : '#ff4d6d', width: '90px' }, text: c.present ? '✓ presente' : '✗ falta' }),
+        el('span', { class: 'tk-hash-val', text: c.name + (c.value ? ' — ' + c.value : ' — ' + c.good) }),
+      ]))
+    })
+    out.appendChild(list)
+    r.warns.forEach((w) => out.appendChild(el('div', { class: 'tk-warn' }, [el('span', { class: 'tk-warn-icon', text: '⚠' }), el('span', { text: w })])))
+  }
+  input.addEventListener('input', update)
+  panel.appendChild(field('Cabeceras HTTP', input))
+  panel.appendChild(out)
+  update()
+}
+
+// ============================================================
 // Modal
 // ============================================================
 const RENDERERS = {
   hash: renderHash,
+  hmac: renderHmac,
   encoder: renderEncoder,
+  base: renderBase,
   pwcheck: renderPwCheck,
   pwgen: renderPwGen,
+  entropy: renderEntropy,
   jwt: renderJWT,
+  jwtsign: renderJwtSign,
   hashid: renderHashId,
+  uuid: renderUuid,
+  timestamp: renderTimestamp,
+  cidr: renderCidr,
+  rot: renderRot,
+  xor: renderXor,
+  regex: renderRegex,
+  json: renderJson,
+  httpheaders: renderHttpHeaders,
   nmap: renderNmap,
 }
 
@@ -405,16 +727,37 @@ function selectTool(id, refName) {
   const body = el('div', { class: 'tk-panel-body' })
   panelEl.appendChild(body)
 
+  // Gating por plan
+  if (id !== 'reference' && !canUseTool(currentUser(), id)) {
+    renderLocked(body, title)
+    return
+  }
+
   if (id === 'reference') renderReference(body, refName)
   else RENDERERS[id]?.(body)
+}
+
+// Panel mostrado cuando la herramienta no está incluida en el plan
+function renderLocked(panel, toolName) {
+  panel.appendChild(el('div', { class: 'tk-locked' }, [
+    el('div', { class: 'tk-locked-icon', text: '🔒' }),
+    el('h3', { class: 'tk-locked-title', text: `"${toolName}" no está en tu plan` }),
+    el('p', { class: 'tk-locked-text', text: 'Mejora tu plan para desbloquear esta y otras herramientas avanzadas del Arsenal.' }),
+    el('button', {
+      class: 'tk-btn',
+      text: '⭐ Ver planes',
+      onClick: () => { closeToolkit(); openBilling() },
+    }),
+  ]))
 }
 
 function buildModal() {
   navEl = el('nav', { class: 'tk-nav' })
 
   INTERACTIVE_TOOLS.forEach((t) => {
+    const locked = !canUseTool(currentUser(), t.id)
     const btn = el('button', {
-      class: 'tk-nav-item',
+      class: `tk-nav-item ${locked ? 'locked' : ''}`,
       dataset: { id: t.id },
       onClick: () => selectTool(t.id),
     }, [
@@ -423,6 +766,7 @@ function buildModal() {
         el('span', { class: 'tk-nav-name', text: t.name }),
         el('span', { class: 'tk-nav-desc', text: t.desc }),
       ]),
+      locked ? el('span', { class: 'tk-lock', title: 'Requiere mejorar el plan', text: '🔒' }) : null,
     ])
     navEl.appendChild(btn)
   })
