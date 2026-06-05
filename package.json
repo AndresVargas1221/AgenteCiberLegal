@@ -1,0 +1,13 @@
+{
+  "name": "cyber-oracle",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "CyberOracle - Asistente futurista de ciberseguridad con base de conocimiento integrada. App sin dependencias ni build (JavaScript vanilla + módulos ES).",
+  "scripts": {
+    "start": "python3 -m http.server 5173",
+    "serve": "python3 -m http.server 5173"
+  },
+  "keywords": ["ciberseguridad", "cybersecurity", "asistente", "chatbot", "seguridad", "infosec"],
+  "license": "MIT"
+}
